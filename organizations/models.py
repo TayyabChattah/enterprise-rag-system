@@ -19,7 +19,9 @@ class User(AbstractUser):
     organization = models.ForeignKey(
         'Organization', 
         on_delete=models.CASCADE, 
-        related_name='users'
+        related_name='users',
+        blank=True,
+        null=True
     )
     email = models.EmailField(unique=True)
 
