@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'accounts',
     'organizations',
     'rest_framework',
+    'drf_spectacular',
 ]
 
 AUTH_USER_MODEL = 'organizations.User'
@@ -119,12 +120,19 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=60),
     "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Enterprise RAG SaaS API",
+    "DESCRIPTION": "API documentation for the Enterprise RAG Knowledge Base platform.",
+    "VERSION": "1.0.0",
 }
 
 # Internationalization
