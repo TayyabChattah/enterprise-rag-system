@@ -28,6 +28,7 @@ class DocumentChunk(models.Model):
     organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE, related_name='document_chunks')
     content = models.TextField()
     embedding_id = models.CharField(max_length=255, blank=True, null=True)
+    index = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
