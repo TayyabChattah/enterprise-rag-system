@@ -133,6 +133,7 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Enterprise RAG SaaS API",
     "DESCRIPTION": "API documentation for the Enterprise RAG Knowledge Base platform.",
     "VERSION": "1.0.0",
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 # Internationalization
