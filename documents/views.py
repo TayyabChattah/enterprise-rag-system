@@ -1,5 +1,7 @@
 from django.shortcuts import render
 
+from rest_framework.response import Response
+
 from rest_framework import viewsets
 
 from documents.tasks import process_document
@@ -30,3 +32,21 @@ class DocumentChunkViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return DocumentChunk.objects.filter(is_active=True, organization=self.request.user.organization)
+    
+class SearchViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    def create(self, request):
+        from .services.vector_search import search_similar_chunks
+        from .serializers import SearchSerializer
+
+        serializer = SearchSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        query = serializer.validated_data['query']
+
+        results = search_similar_chunks(query, organization_id=request.user.organization_id)
+
+        chunk_serializer = DocumentChunkSerializer(results, many=True)
+
+        return Response(chunk_serializer.data)

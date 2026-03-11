@@ -9,5 +9,10 @@ class DocumentSerializer(serializers.ModelSerializer):
 class DocumentChunkSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentChunk
-        fields = ['id', 'document', 'created_at']
+        fields = ['id', 'document','content', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+class SearchSerializer(serializers.Serializer):
+    query = serializers.CharField()
+
