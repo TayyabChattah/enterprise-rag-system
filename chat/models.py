@@ -1,3 +1,3 @@
 from django.db import models
 
-# Create your models here.
+# MVP: chat is session-based in Redis; no DB models.

@@ -37,6 +37,7 @@ urlpatterns = [
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/organizations/", include("organizations.urls")),
     path("api/documents/", include("documents.urls")),
+    path("api/chat/", include("chat.urls")),
 
      # OpenAPI schema
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
