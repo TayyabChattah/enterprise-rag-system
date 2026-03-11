@@ -1,5 +1,5 @@
 from uuid import uuid4
-
+from pgvector.django import VectorField
 from django.db import models
 
 # Create your models here.
@@ -27,7 +27,8 @@ class DocumentChunk(models.Model):
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='chunks')
     organization = models.ForeignKey('organizations.Organization', on_delete=models.CASCADE, related_name='document_chunks')
     content = models.TextField()
-    embedding_id = models.CharField(max_length=255, blank=True, null=True)
+    
+    embedding = VectorField(dimensions=768, null=True, blank=True)
     index = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
