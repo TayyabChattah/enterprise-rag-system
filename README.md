@@ -10,6 +10,26 @@ This project supports multi-tenant (organization-scoped) document upload + RAG c
 3. Open Swagger:
    - `http://localhost:8000/api/docs/`
 
+## MVP Frontend (Streamlit)
+
+This repo includes a simple Streamlit UI for the full MVP flow: register → login → invite → accept → upload docs → search → chat.
+
+### Run with Docker
+
+- Start everything (includes `frontend`):
+  - `docker compose up --build`
+- Open Streamlit:
+  - `http://localhost:8501`
+
+### Run locally (without Docker)
+
+- Install frontend deps:
+  - `pip install -r frontend/requirements.txt`
+- Set API base URL (optional):
+  - `API_BASE_URL=http://localhost:8000`
+- Run:
+  - `streamlit run frontend/streamlit_app.py`
+
 ## Swagger-first testing (recommended)
 
 ### 1) Register an organization (public)
