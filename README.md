@@ -157,6 +157,8 @@ The assistant response will include `sources` and should cite sources inline lik
 
 ## Common issues
 
+- `DisallowedHost` error (HTML page) when calling the API (often from Streamlit container):
+  - Add `ALLOWED_HOSTS=localhost,127.0.0.1,backend` to `.env`, or keep `DEBUG=1` (dev default includes `backend`).
 - `401 Unauthorized` when calling protected endpoints:
   - You forgot Swagger **Authorize** or your token expired.
 - Document upload returns `400 Bad Request`:

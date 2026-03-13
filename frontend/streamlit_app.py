@@ -1,4 +1,6 @@
 import os
+import base64
+import json
 from typing import Any, Optional
 
 import requests
@@ -58,6 +60,72 @@ def ensure_state():
     st.session_state.setdefault("refresh_token", "")
     st.session_state.setdefault("user_email", "")
     st.session_state.setdefault("chat_session_id", "")
+
+
+def _jwt_payload(token: str) -> dict[str, Any]:
+    try:
+        parts = (token or "").split(".")
+        if len(parts) < 2:
+            return {}
+        payload_b64 = parts[1]
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        raw = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
+        data = json.loads(raw.decode("utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def sidebar_me_panel():
+    st.sidebar.subheader("Me")
+
+    token = (st.session_state.get("access_token") or "").strip()
+    if not token:
+        st.sidebar.caption("Not logged in.")
+        return
+
+    payload = _jwt_payload(token)
+    exp = payload.get("exp")
+    exp_str = ""
+    if isinstance(exp, (int, float)) and exp > 0:
+        exp_str = str(exp)
+
+    with st.sidebar.expander("Session", expanded=True):
+        st.code(token[:40] + ("..." if len(token) > 40 else ""), language="text")
+        if exp_str:
+            st.caption(f"JWT exp (unix): `{exp_str}`")
+
+    if st.sidebar.button("Refresh profile", key="btn_me_refresh"):
+        st.session_state["me_profile_refresh"] = (st.session_state.get("me_profile_refresh") or 0) + 1
+
+    _ = st.session_state.get("me_profile_refresh", 0)
+
+    status_u, data_u = api_request("GET", "/api/organizations/users/", token=token)
+    status_o, data_o = api_request("GET", "/api/organizations/organizations/", token=token)
+
+    user_obj: dict[str, Any] | None = None
+    if status_u == 200 and isinstance(data_u, list) and data_u:
+        email = (st.session_state.get("user_email") or "").strip().lower()
+        if email:
+            user_obj = next((u for u in data_u if isinstance(u, dict) and (u.get("email") or "").lower() == email), None)
+        user_obj = user_obj or (data_u[0] if isinstance(data_u[0], dict) else None)
+
+    org_obj: dict[str, Any] | None = None
+    if status_o == 200 and isinstance(data_o, list) and data_o:
+        org_obj = data_o[0] if isinstance(data_o[0], dict) else None
+
+    if user_obj:
+        st.sidebar.caption(f"Email: `{user_obj.get('email','')}`")
+        st.sidebar.caption(f"Role: `{user_obj.get('role','')}`")
+        st.sidebar.caption(f"Org ID: `{user_obj.get('organization','')}`")
+    else:
+        st.sidebar.caption(f"User profile: HTTP {status_u}")
+
+    if org_obj:
+        st.sidebar.caption(f"Org: `{org_obj.get('name','')}`")
+        st.sidebar.caption(f"Slug: `{org_obj.get('slug','')}`")
+    else:
+        st.sidebar.caption(f"Org info: HTTP {status_o}")
 
 
 def section_auth():
@@ -246,6 +314,8 @@ def main():
     st.title("Enterprise RAG SaaS (MVP)")
     st.caption("Org-scoped document upload + RAG chat. Uses the existing Django API.")
 
+    sidebar_me_panel()
+
     section = st.sidebar.selectbox(
         "Section",
         options=["Auth", "Invitations", "Documents", "Chat"],
@@ -264,4 +334,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -31,7 +31,12 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "1"
 
-ALLOWED_HOSTS = []
+_allowed_hosts_env = (os.getenv("ALLOWED_HOSTS") or "").strip()
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts_env.split(",") if h.strip()]
+else:
+    # Docker-compose uses service DNS names like "backend", so include it in dev defaults.
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "backend"] if DEBUG else []
 
 
 # Application definition
