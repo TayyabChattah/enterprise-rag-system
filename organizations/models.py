@@ -1,7 +1,12 @@
 from uuid import uuid4
+import secrets
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.contrib.auth.models import BaseUserManager
+from django.db.models import Q
+from django.utils import timezone
 
 class Organization(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
@@ -65,4 +70,86 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+def _default_invite_expires_at():
+    return timezone.now() + timedelta(days=7)
+
+
+def _generate_invite_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+class OrganizationInvitation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+
+    organization = models.ForeignKey(
+        "Organization",
+        on_delete=models.CASCADE,
+        related_name="invitations",
+    )
+
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES, default="member")
+
+    token = models.CharField(max_length=128, unique=True, default=_generate_invite_token, editable=False)
+
+    STATUS_PENDING = "pending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_REVOKED = "revoked"
+    STATUS_EXPIRED = "expired"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_ACCEPTED, "Accepted"),
+        (STATUS_REVOKED, "Revoked"),
+        (STATUS_EXPIRED, "Expired"),
+    ]
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+
+    invited_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_invitations",
+    )
+    invited_at = models.DateTimeField(auto_now_add=True)
+
+    accepted_by = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_invitations",
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(default=_default_invite_expires_at)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "email"],
+                condition=Q(status="pending"),
+                name="uniq_pending_invite_org_email",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["organization", "email"]),
+            models.Index(fields=["token"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
+    def is_expired(self) -> bool:
+        return bool(self.expires_at and timezone.now() >= self.expires_at)
+
+    def __str__(self):
+        return f"Invite {self.email} to {self.organization_id} ({self.status})"
         

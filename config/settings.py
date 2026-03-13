@@ -137,6 +137,13 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API documentation for the Enterprise RAG Knowledge Base platform.",
     "VERSION": "1.0.0",
     'SERVE_INCLUDE_SCHEMA': False,
+    "COMPONENTS": {
+        "securitySchemes": {
+            "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"},
+        }
+    },
+    "SECURITY": [{"bearerAuth": []}],
+    "SWAGGER_UI_SETTINGS": {"persistAuthorization": True},
 }
 
 MEDIA_URL = "/media/"

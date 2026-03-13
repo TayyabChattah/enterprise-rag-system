@@ -9,6 +9,14 @@ class IsOrgAdmin(BasePermission):
         return bool(getattr(user, "is_superuser", False) or getattr(user, "role", None) == "admin")
 
 
+class HasOrganization(BasePermission):
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        return bool(getattr(user, "organization_id", None))
+
+
 class IsPlatformAdmin(BasePermission):
     def has_permission(self, request, view):
         user = getattr(request, "user", None)

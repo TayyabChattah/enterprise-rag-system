@@ -5,19 +5,34 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 
 from .serializers import SessionCreateSerializer, SessionSendSerializer
 from .services.rag_chat import generate_rag_answer, list_generate_content_models
 from .services.session_store import delete_session, load_messages, save_messages
+from organizations.permissions import HasOrganization
 
 
 class SessionChatViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasOrganization]
+    # Helps drf-spectacular generate a schema for this ViewSet.
+    serializer_class = SessionCreateSerializer
 
     @action(detail=False, methods=["get"], url_path="models")
+    @extend_schema(
+        responses={200: OpenApiResponse(description="List available GenAI chat models (best-effort).")},
+        tags=["chat"],
+        operation_id="chat_models",
+    )
     def models(self, request):
         return Response({"models": list_generate_content_models()})
 
+    @extend_schema(
+        request=SessionCreateSerializer,
+        responses={200: OpenApiResponse(description="Session created (Redis-backed).")},
+        tags=["chat"],
+        operation_id="chat_session_create",
+    )
     def create(self, request):
         serializer = SessionCreateSerializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
@@ -50,6 +65,19 @@ class SessionChatViewSet(viewsets.ViewSet):
         return Response(status=204)
 
     @action(detail=True, methods=["get", "post"], url_path="messages")
+    @extend_schema(
+        methods=["GET"],
+        responses={200: OpenApiResponse(description="Get session messages.")},
+        tags=["chat"],
+        operation_id="chat_session_messages_list",
+    )
+    @extend_schema(
+        methods=["POST"],
+        request=SessionSendSerializer,
+        responses={200: OpenApiResponse(description="Send a message and receive an assistant response.")},
+        tags=["chat"],
+        operation_id="chat_session_messages_send",
+    )
     def messages(self, request, pk=None):
         if request.method == "GET":
             messages = load_messages(

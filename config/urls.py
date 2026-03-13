@@ -28,13 +28,16 @@ from drf_spectacular.views import (
 )
 from django.conf import settings
 from django.conf.urls.static import static
+from organizations.views import InvitationAcceptView, OrganizationRegistrationView
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
 
+    path("api/auth/register/", OrganizationRegistrationView.as_view(), name="org_register"),
     path("api/auth/login/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/auth/invitations/accept/", InvitationAcceptView.as_view(), name="invitation_accept"),
     path("api/organizations/", include("organizations.urls")),
     path("api/documents/", include("documents.urls")),
     path("api/chat/", include("chat.urls")),
