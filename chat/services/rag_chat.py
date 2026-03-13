@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from typing import Any
 
 from google import genai
@@ -17,6 +18,9 @@ def _genai_client() -> genai.Client:
 
 
 _client = _genai_client()
+
+_cached_fallback_model: str | None = None
+_cached_fallback_model_at: float = 0.0
 
 
 def _normalize_model_name(name: str) -> str:
@@ -59,6 +63,28 @@ def list_generate_content_models() -> list[dict[str, Any]]:
     return out
 
 
+def _get_fallback_model() -> str | None:
+    global _cached_fallback_model, _cached_fallback_model_at
+
+    now = time.time()
+    if _cached_fallback_model and (now - _cached_fallback_model_at) < 3600:
+        return _cached_fallback_model
+
+    models = list_generate_content_models()
+    if not models:
+        return None
+
+    # Prefer "flash" style models when possible.
+    names = [_normalize_model_name(m.get("name", "")) for m in models]
+    preferred = next((n for n in names if "flash" in (n or "").lower()), None)
+    chosen = preferred or next((n for n in names if n), None)
+
+    _cached_fallback_model = chosen
+    _cached_fallback_model_at = now
+
+    return chosen
+
+
 def _build_context(chunks, max_chars_per_chunk: int = 1200) -> tuple[str, list[dict[str, Any]]]:
     sources: list[dict[str, Any]] = []
     context_parts: list[str] = []
@@ -97,14 +123,8 @@ def _build_history(history: list[dict[str, Any]] | None, max_messages: int = 20)
         if not role or not content:
             continue
         lines.append(f"{role.upper()}: {content}")
+
     return "\n".join(lines).strip()
-
-
-def _try_generate(model_name: str, prompt: str) -> str:
-    model_name = _normalize_model_name(model_name)
-    resp = _client.models.generate_content(model=model_name, contents=prompt)
-    text = getattr(resp, "text", None)
-    return (text or str(resp)).strip()
 
 
 def generate_rag_answer(
@@ -138,24 +158,41 @@ def generate_rag_answer(
         + "ANSWER:"
     )
 
-    preferred = _normalize_model_name(os.getenv("GENAI_CHAT_MODEL", ""))
-    candidates: list[str] = [c for c in [preferred] if c]
+    configured = _normalize_model_name(os.getenv("GENAI_CHAT_MODEL", ""))
+    model_name = configured
 
-    last_exc: Exception | None = None
+    if not model_name:
+        model_name = _get_fallback_model() or ""
 
-    for model_name in candidates:
-        try:
-            return _try_generate(model_name, prompt), sources
-        except Exception as exc:
-            last_exc = exc
-            logger.exception("GenAI generate_content failed (model=%s)", model_name)
+    if not model_name:
+        if os.getenv("DEBUG") == "1":
+            return "No chat model available. Call /api/chat/sessions/models/ and set GENAI_CHAT_MODEL.", sources
+        return "Chat model is not configured.", sources
 
-    if os.getenv("DEBUG") == "1" and last_exc is not None:
-        hint = " Use /api/chat/sessions/models/ to pick GENAI_CHAT_MODEL."
-        return f"LLM generation failed: {last_exc.__class__.__name__}: {last_exc}.{hint}", sources
+    try:
+        resp = _client.models.generate_content(model=model_name, contents=prompt)
+        text = getattr(resp, "text", None)
+        return (text or str(resp)).strip(), sources
+    except Exception as exc:
+        msg = str(exc)
+        logger.exception("GenAI generate_content failed (model=%s)", model_name)
 
-    fallback = (
-        "I found relevant sources, but the chat model isn't configured/available right now. "
-        "Here are the sources that match your question."
-    )
-    return fallback, sources
+        # If the configured model is wrong/not supported, try a discovered fallback.
+        if configured and ("NOT_FOUND" in msg or "is not found" in msg or "404" in msg):
+            fallback_model = _get_fallback_model()
+            if fallback_model and fallback_model != model_name:
+                try:
+                    resp = _client.models.generate_content(model=fallback_model, contents=prompt)
+                    text = getattr(resp, "text", None)
+                    return (text or str(resp)).strip(), sources
+                except Exception:
+                    logger.exception("GenAI generate_content failed (fallback_model=%s)", fallback_model)
+
+        if os.getenv("DEBUG") == "1":
+            return f"LLM generation failed: {exc.__class__.__name__}: {exc}", sources
+
+        fallback = (
+            "I found relevant sources, but the chat model isn't configured/available right now. "
+            "Here are the sources that match your question."
+        )
+        return fallback, sources
